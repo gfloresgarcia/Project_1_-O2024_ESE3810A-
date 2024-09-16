@@ -33,6 +33,8 @@
 /*******************************************************************************
  * Variables
  ******************************************************************************/
+extern uint8_t flagRx;
+extern uint8_t flagTx;
 
 /*******************************************************************************
  * Code
@@ -73,12 +75,17 @@ int main(void)
 
     while (1)
     {
+    	SDK_DelayAtLeastUs(2000000, SDK_DEVICE_MAXIMUM_CPU_CLOCK_FREQUENCY);
+
     	//In this section of the code i will to call function to send and receive
     	//Ethernet packages using the library security_layer
+    	if (sendPackageWithSecurityLayer("Envia paquete 1 para prueba de cifrado y CRC32") == packageSent_OK) {
+    		//Check flag RX
+    		while(flagRx == 0); //{
+    			//SDK_DelayAtLeastUs(500, SDK_DEVICE_MAXIMUM_CPU_CLOCK_FREQUENCY);
+    		//}
 
-    	if (sendPackageWithSecurityLayer("Envia paquete 1") == packageSent_OK) {
-    		//
-
+    		receivePackageWithSecurityLayer();
     	}
 
 

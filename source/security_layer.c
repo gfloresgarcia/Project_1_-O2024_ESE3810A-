@@ -21,11 +21,20 @@
  * Variables
  ******************************************************************************/
 uint8_t g_macAddr[6] = MAC_ADDRESS;
+uint8_t g_macAddrDest[6] = MAC_Destination;
+
+typedef struct {
+	uint8_t frame[HeaderETH + DataLength];
+	size_t length;
+} framesTxRx;
 
 framesTxRx encrypted;
 framesTxRx encryptedWithCRC;
 
-uint8_t flagRX = 0, flagTx = 0;
+framesTxRx received;
+framesTxRx decrypted;
+
+uint8_t flagRx = 0, flagTx = 0;
 
 void ENET_SignalEvent_t(uint32_t event)
 {
@@ -47,7 +56,15 @@ void ENET_SignalEvent_t(uint32_t event)
                 if (size == len)
                 {
                     //I can set a flag to indicate that a message was received
-                	flagRX = 1;
+                	if (data[0] != 0xFF) {
+						memcpy(received.frame, data, size);
+						for (int i = 0; i < size - HeaderETH; i++) {
+							received.frame[i] = data[i + HeaderETH];
+						}
+						received.length = size - HeaderETH;
+
+						flagRx = 1;
+                	}
                 }
                 free(data);
             }
@@ -108,6 +125,10 @@ void encryptPackage(uint8_t* toEncrypt) {
 	AES_CBC_encrypt_buffer(&ctx, encrypted.frame, encrypted.length);
 }
 
+void decryptPackage(void) {
+
+}
+
 static void InitCrc32(CRC_Type *base, uint32_t seed) {
     crc_config_t config;
 
@@ -133,28 +154,63 @@ uint32_t calculateCRC32(uint8_t* toCalculate, size_t length) {
 	return crc32;
 }
 
-void addCRC32(uint8_t* toAdd, size_t length, uint32_t add) {
-	memcpy(encryptedWithCRC.frame, toAdd, length);
-	encryptedWithCRC.frame[length] = (uint8_t)((add & 0xFF000000) >> 24);
-	encryptedWithCRC.frame[length+1] = (uint8_t)((add & 0x00FF0000) >> 16);
-	encryptedWithCRC.frame[length+2] = (uint8_t)((add & 0x0000FF00) >> 8);
-	encryptedWithCRC.frame[length+3] = (uint8_t)((add & 0x000000FF));
-	encryptedWithCRC.length+=4;
+void addCRC32(framesTxRx *toAdd, framesTxRx *toSend, uint32_t add) {
+	for (int i = 0; i < toAdd->length; i++) {
+		toSend->frame[i + HeaderETH] = toAdd->frame[i];
+	}
+	toSend->length = toAdd->length;
+
+	toSend->frame[toSend->length + HeaderETH] = (uint8_t)((add & 0xFF000000) >> 24);
+	toSend->frame[toSend->length + HeaderETH + 1] = (uint8_t)((add & 0x00FF0000) >> 16);
+	toSend->frame[toSend->length + HeaderETH + 2] = (uint8_t)((add & 0x0000FF00) >> 8);
+	toSend->frame[toSend->length + HeaderETH + 3] = (uint8_t)((add & 0x000000FF));
+	toSend->length += 4;
+}
+
+void addHeader(framesTxRx *toSend) {
+    uint32_t length = toSend->length;
+
+	memcpy(&toSend->frame[0], &g_macAddrDest[0], 6U);
+    memcpy(&toSend->frame[6], &g_macAddr[0], 6U);
+    toSend->frame[12] = (length >> 8) & 0xFFU;
+    toSend->frame[13] = length & 0xFFU;
 }
 
 SL_result sendPackageWithSecurityLayer(uint8_t* message) {
 	uint32_t crc32 = 0;
-	flagRX = 0, flagTx = 0;
+	flagRx = 0, flagTx = 0;
+
+	PRINTF("\r\nPackage to send: '%s'\r\n", message);
 
 	encryptPackage(message);
 	crc32 = calculateCRC32(encrypted.frame, encrypted.length);
-	addCRC32(encrypted.frame, encrypted.length, crc32);
+	PRINTF("CRC32 calculated: '%x'\r\n", crc32);
+	addCRC32(&encrypted, &encryptedWithCRC, crc32);
+	addHeader(&encryptedWithCRC);
 
-	if (EXAMPLE_ENET.SendFrame(&encryptedWithCRC.frame[0], encryptedWithCRC.length, ARM_ETH_MAC_TX_FRAME_EVENT) == ARM_DRIVER_OK && flagTx == 1) {
+	if (EXAMPLE_ENET.SendFrame(&encryptedWithCRC.frame[0], encryptedWithCRC.length + HeaderETH, ARM_ETH_MAC_TX_FRAME_EVENT) == ARM_DRIVER_OK) {
+		PRINTF("\r\nPackage sent successfully\r\n");
 		return packageSent_OK;
-		//SDK_DelayAtLeastUs(1000, SDK_DEVICE_MAXIMUM_CPU_CLOCK_FREQUENCY);
 	}
 	else {
+		PRINTF("\r\nPackage sent incorrectly\r\n");
 		return packageSent_ERROR;
+	}
+}
+
+SL_result receivePackageWithSecurityLayer(void) {
+	uint32_t getCRC32 = 0;
+	uint32_t crc32 = 0;
+
+	getCRC32 = (received.frame[received.length - 4] << 24) | (received.frame[received.length - 3] << 16) | (received.frame[received.length - 2] << 8) | received.frame[received.length - 1];
+	crc32 = calculateCRC32(received.frame, received.length - 4);
+
+	if (getCRC32 == crc32) {
+		PRINTF("\r\nPackage received CRC32 OK\r\n");
+		return packageReceive_OK;
+	}
+	else {
+		PRINTF("\r\nPackage received CRC32 ERROR\r\n");
+		return crc32_ERROR;
 	}
 }

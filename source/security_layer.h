@@ -10,11 +10,6 @@
 
 #include "stdint.h"
 
-typedef struct {
-	uint8_t frame[100];
-	size_t length;
-} framesTxRx;
-
 typedef enum {
 	packageSent_OK,
 	packageSent_ERROR,
@@ -31,6 +26,5 @@ void encryptPackage(uint8_t* toEncrypt);
 void decryptPackage(void);
 
 uint32_t calculateCRC32(uint8_t* toCalculate, size_t length);
-void addCRC32(uint8_t* toAdd, size_t length, uint32_t add);
 
 #endif /* SECURITY_LAYER_H_ */
