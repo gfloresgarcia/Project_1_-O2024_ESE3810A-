@@ -23,7 +23,7 @@ SL_result sendPackageWithSecurityLayer(uint8_t* message);
 SL_result receivePackageWithSecurityLayer(void);
 
 void encryptPackage(uint8_t* toEncrypt);
-void decryptPackage(void);
+void decryptPackage(uint8_t* toDecrypt);
 
 uint32_t calculateCRC32(uint8_t* toCalculate, size_t length);
 

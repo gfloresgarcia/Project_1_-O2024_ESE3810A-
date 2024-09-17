@@ -125,8 +125,21 @@ void encryptPackage(uint8_t* toEncrypt) {
 	AES_CBC_encrypt_buffer(&ctx, encrypted.frame, encrypted.length);
 }
 
-void decryptPackage(void) {
+void decryptPackage(uint8_t* toDecrypt) {
+	uint8_t key[] = KEY;
+	uint8_t iv[]  = IV;
 
+	struct AES_ctx ctx;
+
+	decrypted.length = 0;
+	memset(decrypted.frame, 0, sizeof(decrypted.frame));
+
+	AES_init_ctx_iv(&ctx, key, iv);
+
+	decrypted.length = strlen(toDecrypt);
+	memcpy(decrypted.frame, toDecrypt, decrypted.length);
+
+	AES_CBC_decrypt_buffer(&ctx, decrypted.frame, decrypted.length);
 }
 
 static void InitCrc32(CRC_Type *base, uint32_t seed) {
@@ -178,6 +191,8 @@ void addHeader(framesTxRx *toSend) {
 
 SL_result sendPackageWithSecurityLayer(uint8_t* message) {
 	uint32_t crc32 = 0;
+	received.length = 0;
+	memset(received.frame, 0, sizeof(received.frame));
 	flagRx = 0, flagTx = 0;
 
 	PRINTF("\r\nPackage to send: '%s'\r\n", message);
@@ -201,12 +216,19 @@ SL_result sendPackageWithSecurityLayer(uint8_t* message) {
 SL_result receivePackageWithSecurityLayer(void) {
 	uint32_t getCRC32 = 0;
 	uint32_t crc32 = 0;
+	uint8_t message[HeaderETH + DataLength] = {0};
 
 	getCRC32 = (received.frame[received.length - 4] << 24) | (received.frame[received.length - 3] << 16) | (received.frame[received.length - 2] << 8) | received.frame[received.length - 1];
 	crc32 = calculateCRC32(received.frame, received.length - 4);
 
 	if (getCRC32 == crc32) {
 		PRINTF("\r\nPackage received CRC32 OK\r\n");
+
+		memcpy(message, received.frame, received.length - 4);
+		decryptPackage(message);
+
+		PRINTF("\r\nPackage decrypted: '%s'\r\n", decrypted.frame);
+
 		return packageReceive_OK;
 	}
 	else {

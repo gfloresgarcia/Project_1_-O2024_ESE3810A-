@@ -81,9 +81,9 @@ int main(void)
     	//Ethernet packages using the library security_layer
     	if (sendPackageWithSecurityLayer("Envia paquete 1 para prueba de cifrado y CRC32") == packageSent_OK) {
     		//Check flag RX
-    		while(flagRx == 0); //{
-    			//SDK_DelayAtLeastUs(500, SDK_DEVICE_MAXIMUM_CPU_CLOCK_FREQUENCY);
-    		//}
+    		while(flagRx == 0); {
+    			SDK_DelayAtLeastUs(500, SDK_DEVICE_MAXIMUM_CPU_CLOCK_FREQUENCY);
+    		}
 
     		receivePackageWithSecurityLayer();
     	}
