@@ -58,10 +58,10 @@ void ENET_SignalEvent_t(uint32_t event)
                     //I can set a flag to indicate that a message was received
                 	if (data[0] != 0xFF) {
 						memcpy(received.frame, data, size);
-						for (int i = 0; i < size - HeaderETH; i++) {
+						for (int i = 0; i < (uint16_t)((data[12] << 8) | data[13]); i++) {
 							received.frame[i] = data[i + HeaderETH];
 						}
-						received.length = size - HeaderETH;
+						received.length = (uint16_t)((data[12] << 8) | data[13]);
 
 						flagRx = 1;
                 	}
@@ -190,6 +190,7 @@ void addHeader(framesTxRx *toSend) {
 }
 
 SL_result sendPackageWithSecurityLayer(uint8_t* message) {
+	uint16_t addPadding = 0;
 	uint32_t crc32 = 0;
 	received.length = 0;
 	memset(received.frame, 0, sizeof(received.frame));
@@ -203,7 +204,13 @@ SL_result sendPackageWithSecurityLayer(uint8_t* message) {
 	addCRC32(&encrypted, &encryptedWithCRC, crc32);
 	addHeader(&encryptedWithCRC);
 
-	if (EXAMPLE_ENET.SendFrame(&encryptedWithCRC.frame[0], encryptedWithCRC.length + HeaderETH, ARM_ETH_MAC_TX_FRAME_EVENT) == ARM_DRIVER_OK) {
+	//Check if the packet is less than 46 bytes
+	if (encryptedWithCRC.length < MinData) {
+		addPadding = 46 - encryptedWithCRC.length;
+	}
+	else addPadding = 0;
+
+	if (EXAMPLE_ENET.SendFrame(&encryptedWithCRC.frame[0], encryptedWithCRC.length + addPadding + HeaderETH, ARM_ETH_MAC_TX_FRAME_EVENT) == ARM_DRIVER_OK) {
 		PRINTF("\r\nPackage sent successfully\r\n");
 		return packageSent_OK;
 	}
