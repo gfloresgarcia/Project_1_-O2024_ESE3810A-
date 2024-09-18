@@ -13,6 +13,7 @@
 #include "board.h"
 #include "fsl_debug_console.h"
 #include "stdlib.h"
+#include "stdio.h"
 #include "security_layer.h"
 
 #include "fsl_common.h"
@@ -34,7 +35,10 @@
  * Variables
  ******************************************************************************/
 extern uint8_t flagRx;
-extern uint8_t flagTx;
+
+//Structure to create 8 messages with different length and data
+framesTxRx Test[8];
+
 
 /*******************************************************************************
  * Code
@@ -45,6 +49,18 @@ phy_handle_t phyHandle   = {.phyAddr = RTE_ENET_PHY_ADDRESS, .mdioHandle = &mdio
 uint32_t ENET0_GetFreq(void)
 {
     return CLOCK_GetFreq(kCLOCK_CoreSysClk);
+}
+
+//Create function to construct test messages
+static void fill_Messages(void) {
+	Test[0].length = sprintf(Test[0].frame, "Prueba");
+	Test[1].length = sprintf(Test[1].frame, "Derf");
+	Test[2].length = sprintf(Test[2].frame, "Tripiante");
+	Test[3].length = sprintf(Test[3].frame, "Flumpo");
+	Test[4].length = sprintf(Test[4].frame, "Sistemas de comunicion para sistemas embebidos e IoT");
+	Test[5].length = sprintf(Test[5].frame, "   ");
+	Test[6].length = sprintf(Test[6].frame, "Oye tranquilo viejo. Bendiciones matinales. La UEMAFEM. Tripiante. Flumpo.");
+	Test[7].length = sprintf(Test[7].frame, "El hermano de calceto, corbato. La UEMAFEM.");
 }
 
 /*!
@@ -75,19 +91,25 @@ int main(void)
 
     while (1)
     {
-    	SDK_DelayAtLeastUs(2000000, SDK_DEVICE_MAXIMUM_CPU_CLOCK_FREQUENCY);
+    	fill_Messages();
 
-    	//In this section of the code i will to call function to send and receive
-    	//Ethernet packages using the library security_layer
-    	if (sendPackageWithSecurityLayer("Super Sam") == packageSent_OK) {
-    		//Check flag RX
-    		while(flagRx == 0) {
-    			SDK_DelayAtLeastUs(500, SDK_DEVICE_MAXIMUM_CPU_CLOCK_FREQUENCY);
-    		}
+    	for (int i = 0; i < 8; i++) {
+    		PRINTF("\r\n\r\nEnvio de frame %d ...\r\n", i + 1);
 
-    		receivePackageWithSecurityLayer();
+        	SDK_DelayAtLeastUs(2000000, SDK_DEVICE_MAXIMUM_CPU_CLOCK_FREQUENCY);
+
+        	//In this section of the code i will to call function to send and receive
+        	//Ethernet packages using the library security_layer
+        	if (sendPackageWithSecurityLayer(&Test[i]) == packageSent_OK) {
+        		//Check flag RX
+        		while(flagRx == 0) {
+        			SDK_DelayAtLeastUs(500, SDK_DEVICE_MAXIMUM_CPU_CLOCK_FREQUENCY);
+        		}
+
+        		receivePackageWithSecurityLayer();
+        	}
     	}
 
-
+    	while(1);
     }
 }

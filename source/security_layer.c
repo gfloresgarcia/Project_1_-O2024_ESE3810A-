@@ -6,7 +6,6 @@
  */
 
 #include "security_layer.h"
-#include "security_layer_cfg.h"
 #include "fsl_debug_console.h"
 #include "Driver_ETH_MAC.h"
 #include "fsl_enet.h"
@@ -22,11 +21,6 @@
  ******************************************************************************/
 uint8_t g_macAddr[6] = MAC_ADDRESS;
 uint8_t g_macAddrDest[6] = MAC_Destination;
-
-typedef struct {
-	uint8_t frame[HeaderETH + DataLength];
-	size_t length;
-} framesTxRx;
 
 framesTxRx encrypted;
 framesTxRx encryptedWithCRC;
@@ -106,7 +100,7 @@ void ENET_Initialization(void) {
     } while (1);
 }
 
-void encryptPackage(uint8_t* toEncrypt) {
+void encryptPackage(framesTxRx* toEncrypt) {
 	uint8_t key[] = KEY;
 	uint8_t iv[]  = IV;
 
@@ -118,14 +112,14 @@ void encryptPackage(uint8_t* toEncrypt) {
 
 	AES_init_ctx_iv(&ctx, key, iv);
 
-	toEncryptLength = strlen(toEncrypt);
+	toEncryptLength = toEncrypt->length;
 	encrypted.length = toEncryptLength + (16 - (toEncryptLength % 16));
 	memcpy(encrypted.frame, toEncrypt, toEncryptLength);
 
 	AES_CBC_encrypt_buffer(&ctx, encrypted.frame, encrypted.length);
 }
 
-void decryptPackage(uint8_t* toDecrypt) {
+void decryptPackage(framesTxRx* toDecrypt) {
 	uint8_t key[] = KEY;
 	uint8_t iv[]  = IV;
 
@@ -136,7 +130,7 @@ void decryptPackage(uint8_t* toDecrypt) {
 
 	AES_init_ctx_iv(&ctx, key, iv);
 
-	decrypted.length = strlen(toDecrypt);
+	decrypted.length = toDecrypt->length;
 	memcpy(decrypted.frame, toDecrypt, decrypted.length);
 
 	AES_CBC_decrypt_buffer(&ctx, decrypted.frame, decrypted.length);
@@ -189,14 +183,16 @@ void addHeader(framesTxRx *toSend) {
     toSend->frame[13] = length & 0xFFU;
 }
 
-SL_result sendPackageWithSecurityLayer(uint8_t* message) {
+SL_result sendPackageWithSecurityLayer(framesTxRx* message) {
 	uint16_t addPadding = 0;
 	uint32_t crc32 = 0;
 	received.length = 0;
 	memset(received.frame, 0, sizeof(received.frame));
+	encryptedWithCRC.length = 0;
+	memset(encryptedWithCRC.frame, 0, sizeof(encryptedWithCRC.frame));
 	flagRx = 0, flagTx = 0;
 
-	PRINTF("\r\nPackage to send: '%s'\r\n", message);
+	PRINTF("Package to send: '%s'\r\n", message);
 
 	encryptPackage(message);
 	crc32 = calculateCRC32(encrypted.frame, encrypted.length);
@@ -211,11 +207,11 @@ SL_result sendPackageWithSecurityLayer(uint8_t* message) {
 	else addPadding = 0;
 
 	if (EXAMPLE_ENET.SendFrame(&encryptedWithCRC.frame[0], encryptedWithCRC.length + addPadding + HeaderETH, ARM_ETH_MAC_TX_FRAME_EVENT) == ARM_DRIVER_OK) {
-		PRINTF("\r\nPackage sent successfully\r\n");
+		PRINTF("Package sent successfully... \r\n");
 		return packageSent_OK;
 	}
 	else {
-		PRINTF("\r\nPackage sent incorrectly\r\n");
+		PRINTF("Package sent incorrectly... \r\n");
 		return packageSent_ERROR;
 	}
 }
@@ -223,23 +219,25 @@ SL_result sendPackageWithSecurityLayer(uint8_t* message) {
 SL_result receivePackageWithSecurityLayer(void) {
 	uint32_t getCRC32 = 0;
 	uint32_t crc32 = 0;
-	uint8_t message[HeaderETH + DataLength] = {0};
+	framesTxRx message;
 
 	getCRC32 = (received.frame[received.length - 4] << 24) | (received.frame[received.length - 3] << 16) | (received.frame[received.length - 2] << 8) | received.frame[received.length - 1];
 	crc32 = calculateCRC32(received.frame, received.length - 4);
 
 	if (getCRC32 == crc32) {
-		PRINTF("\r\nPackage received CRC32 OK\r\n");
+		PRINTF(" --- >>> Package received CRC32 OK Comparation %x == %x\r\n", getCRC32, crc32);
 
-		memcpy(message, received.frame, received.length - 4);
-		decryptPackage(message);
+		memset(message.frame, 0, sizeof(message.frame));
+		memcpy(message.frame, received.frame, received.length - 4);
+		message.length = received.length - 4;
+		decryptPackage(&message);
 
-		PRINTF("\r\nPackage decrypted: '%s'\r\n", decrypted.frame);
+		PRINTF("Package decrypted: '%s'\r\n", decrypted.frame);
 
 		return packageReceive_OK;
 	}
 	else {
-		PRINTF("\r\nPackage received CRC32 ERROR\r\n");
+		PRINTF("Package received CRC32 ERROR\r\n");
 		return crc32_ERROR;
 	}
 }

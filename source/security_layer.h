@@ -9,6 +9,7 @@
 #define SECURITY_LAYER_H_
 
 #include "stdint.h"
+#include "security_layer_cfg.h"
 
 typedef enum {
 	packageSent_OK,
@@ -17,13 +18,18 @@ typedef enum {
 	crc32_ERROR
 } SL_result;
 
+typedef struct {
+	uint8_t frame[HeaderETH + DataLength];
+	size_t length;
+} framesTxRx;
+
 void ENET_Initialization(void);
 
-SL_result sendPackageWithSecurityLayer(uint8_t* message);
+SL_result sendPackageWithSecurityLayer(framesTxRx* message);
 SL_result receivePackageWithSecurityLayer(void);
 
-void encryptPackage(uint8_t* toEncrypt);
-void decryptPackage(uint8_t* toDecrypt);
+void encryptPackage(framesTxRx* toEncrypt);
+void decryptPackage(framesTxRx* toDecrypt);
 
 uint32_t calculateCRC32(uint8_t* toCalculate, size_t length);
 
