@@ -38,6 +38,7 @@ extern uint8_t flagRx;
 
 //Structure to create 8 messages with different length and data
 framesTxRx Test[8];
+framesTxRx message;
 
 
 /*******************************************************************************
@@ -106,7 +107,12 @@ int main(void)
         			SDK_DelayAtLeastUs(500, SDK_DEVICE_MAXIMUM_CPU_CLOCK_FREQUENCY);
         		}
 
-        		receivePackageWithSecurityLayer();
+        		if (receivePackageWithSecurityLayer() == packageReceive_OK) {
+        			memset(message.frame, 0, sizeof(message.frame));
+        			message.length = 0;
+
+        			message = getMessageDecrypted();
+        		}
         	}
     	}
 

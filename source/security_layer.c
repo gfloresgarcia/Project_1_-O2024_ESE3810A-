@@ -206,7 +206,9 @@ SL_result sendPackageWithSecurityLayer(framesTxRx* message) {
 	}
 	else addPadding = 0;
 
-	if (EXAMPLE_ENET.SendFrame(&encryptedWithCRC.frame[0], encryptedWithCRC.length + addPadding + HeaderETH, ARM_ETH_MAC_TX_FRAME_EVENT) == ARM_DRIVER_OK) {
+	if (EXAMPLE_ENET.SendFrame(&encryptedWithCRC.frame[0],
+								encryptedWithCRC.length + addPadding + HeaderETH,
+								ARM_ETH_MAC_TX_FRAME_EVENT) == ARM_DRIVER_OK) {
 		PRINTF("Package sent successfully... \r\n");
 		return packageSent_OK;
 	}
@@ -240,4 +242,8 @@ SL_result receivePackageWithSecurityLayer(void) {
 		PRINTF("Package received CRC32 ERROR\r\n");
 		return crc32_ERROR;
 	}
+}
+
+framesTxRx getMessageDecrypted(void) {
+	return decrypted;
 }

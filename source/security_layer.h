@@ -27,10 +27,6 @@ void ENET_Initialization(void);
 
 SL_result sendPackageWithSecurityLayer(framesTxRx* message);
 SL_result receivePackageWithSecurityLayer(void);
-
-void encryptPackage(framesTxRx* toEncrypt);
-void decryptPackage(framesTxRx* toDecrypt);
-
-uint32_t calculateCRC32(uint8_t* toCalculate, size_t length);
+framesTxRx getMessageDecrypted(void);
 
 #endif /* SECURITY_LAYER_H_ */
